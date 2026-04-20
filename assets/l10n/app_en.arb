@@ -1,0 +1,19 @@
+{
+  "appName": "Hasaad",
+  "login": "Login",
+  "register": "Register",
+  "nationalId": "National ID",
+  "password": "Password",
+  "fullName": "Full Name",
+  "governorate": "Governorate",
+  "landSize": "Land Size (Dunum)",
+  "submit": "Submit",
+  "completeRegistration": "Complete Registration",
+  "errorOccurred": "An error occurred",
+  "userNotFound": "User not found, please register",
+  "invalidNationalId": "National ID must be 10 digits",
+  "invalidLandSize": "Land size must be greater than 0",
+  "requiredField": "This field is required",
+  "switchLanguage": "العربية",
+  "jordan": "Jordan"
+}

@@ -1,0 +1,57 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner.xcworkspace
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Linux
+*~
+
+# Firebase / misc
+firebase-debug.log
+
+# Env files (important if you use secrets)
+.env
+*.env
+
+# Keystore (DO NOT COMMIT SIGNING KEYS)
+*.jks
+*.keystore
+
+# Coverage reports
+coverage/
+
+# Temporary files
+*.log
+*.lock

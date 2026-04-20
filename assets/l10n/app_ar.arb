@@ -1,0 +1,19 @@
+{
+  "appName": "حصاد",
+  "login": "تسجيل الدخول",
+  "register": "تسجيل",
+  "nationalId": "الرقم الوطني",
+  "password": "كلمة المرور",
+  "fullName": "الاسم الكامل",
+  "governorate": "المحافظة",
+  "landSize": "مساحة الأرض (دونم)",
+  "submit": "إرسال",
+  "completeRegistration": "إكمال التسجيل",
+  "errorOccurred": "حدث خطأ ما",
+  "userNotFound": "المستخدم غير موجود، يرجى التسجيل",
+  "invalidNationalId": "يجب أن يتكون الرقم الوطني من 10 أرقام",
+  "invalidLandSize": "يجب أن تكون مساحة الأرض أكبر من 0",
+  "requiredField": "هذا الحقل مطلوب",
+  "switchLanguage": "English",
+  "jordan": "الأردن"
+}
