@@ -38,9 +38,9 @@
          In particular, this is used by the Flutter engine of Google Docs (https://docs.google.com)
          to implement clipboard functionality. -->
     <queries>
-        <intent-filter>
+        <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
-        </intent-filter>
+        </intent>
     </queries>
 </manifest>

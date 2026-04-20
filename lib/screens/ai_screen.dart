@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_localizations.dart';
+import 'profit_prediction_screen.dart';
 
 class AiScreen extends StatefulWidget {
   const AiScreen({super.key});
@@ -74,12 +75,28 @@ class _AiScreenState extends State<AiScreen> with SingleTickerProviderStateMixin
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfitPredictionScreen()),
+              );
+            },
+            child: _buildFeatureCard(
+              icon: Icons.monetization_on_outlined,
+              title: l10n.translate('profit_prediction'),
+              description: l10n.translate('predictions_desc'),
+              color: primaryGreen,
+              isActionable: true,
+            ),
+          ),
+          const SizedBox(height: 16),
           _buildComingSoonBanner(l10n, primaryGreen),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _buildFeatureCard(
             icon: Icons.trending_up,
             title: l10n.translate('market_intelligence'),
-            description: l10n.translate('predictions_desc'),
+            description: "Advanced trend analysis for local markets.",
             color: darkGreen,
           ),
           const SizedBox(height: 16),
@@ -153,7 +170,7 @@ class _AiScreenState extends State<AiScreen> with SingleTickerProviderStateMixin
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
-                      fillColor: Colors.transparent, // Fix the white background issue
+                      fillColor: Colors.transparent,
                       filled: true,
                       hintStyle: GoogleFonts.cairo(fontSize: 14, color: Colors.grey),
                     ),
@@ -172,12 +189,19 @@ class _AiScreenState extends State<AiScreen> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildFeatureCard({required IconData icon, required String title, required String description, required Color color}) {
+  Widget _buildFeatureCard({
+    required IconData icon, 
+    required String title, 
+    required String description, 
+    required Color color,
+    bool isActionable = false,
+  }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: isActionable ? Border.all(color: color.withOpacity(0.3), width: 2) : null,
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))],
       ),
       child: Row(
@@ -192,11 +216,24 @@ class _AiScreenState extends State<AiScreen> with SingleTickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                Row(
+                  children: [
+                    Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                    if (isActionable) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
+                        child: Text("NEW", style: GoogleFonts.cairo(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(description, style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[600]), maxLines: 2, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
+          if (isActionable) Icon(Icons.arrow_forward_ios, size: 14, color: color),
         ],
       ),
     );
