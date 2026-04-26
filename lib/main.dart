@@ -4,10 +4,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_localizations.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 
@@ -45,7 +47,6 @@ class _HasaadAppState extends State<HasaadApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Reverted to simple theme based on brand color #015E54
     const brandGreen = Color(0xFF015E54);
 
     return MaterialApp(
@@ -137,14 +138,28 @@ class _AuthCheckState extends State<AuthCheck> {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedOut) {
         if (mounted) {
-          setState(() {
-            _targetScreen = LoginScreen(onLanguageChange: widget.onLanguageChange);
-          });
+          _checkOnboardingStatus();
         }
       } else if (data.event == AuthChangeEvent.signedIn) {
         _checkSession();
       }
     });
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+
+    if (mounted) {
+      setState(() {
+        if (onboardingCompleted) {
+          _targetScreen = LoginScreen(onLanguageChange: widget.onLanguageChange);
+        } else {
+          _targetScreen = OnboardingScreen(onLanguageChange: widget.onLanguageChange);
+        }
+        _checking = false;
+      });
+    }
   }
 
   Future<void> _checkSession() async {
@@ -154,7 +169,7 @@ class _AuthCheckState extends State<AuthCheck> {
     final session = Supabase.instance.client.auth.currentSession;
     
     if (session == null) {
-      _setTarget(LoginScreen(onLanguageChange: widget.onLanguageChange));
+      await _checkOnboardingStatus();
       return;
     }
 
@@ -167,7 +182,7 @@ class _AuthCheckState extends State<AuthCheck> {
       }
     } catch (e) {
       debugPrint('Error checking session profile: $e');
-      _setTarget(LoginScreen(onLanguageChange: widget.onLanguageChange));
+      await _checkOnboardingStatus();
     }
   }
 

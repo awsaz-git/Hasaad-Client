@@ -28,7 +28,9 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
   List<Crop> _allCrops = [];
   List<Crop> _filteredCrops = [];
   List<CropCategory> _categories = [];
+  List<Governorate> _governorates = [];
   
+  int? _selectedMarketGovId;
   int? _selectedCategoryId;
   int? _selectedCropId;
   DateTime? _predictionDate;
@@ -60,6 +62,7 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
         _userGov = myGov;
         _allCrops = crops;
         _categories = categories;
+        _governorates = govs;
         _isLoading = false;
       });
     } catch (e) {
@@ -93,10 +96,23 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
     }
   }
 
+  String _mapGovernorateToMarket(String govEn) {
+    final ammanMarkets = ["Amman", "Madaba", "Balqa"];
+    final zarqaMarkets = ["Zarqa", "Mafraq"];
+    final irbidMarkets = ["Irbid", "Jarash", "Ajloun"];
+    final aqabaMarkets = ["Aqaba", "Ma'an", "Karak", "Tafilah"];
+
+    if (ammanMarkets.contains(govEn)) return "Amman";
+    if (zarqaMarkets.contains(govEn)) return "Zarqa";
+    if (irbidMarkets.contains(govEn)) return "Irbid";
+    if (aqabaMarkets.contains(govEn)) return "Aqaba";
+    return "Other";
+  }
+
   Future<void> _submitPrediction() async {
     final l10n = AppLocalizations.of(context)!;
     
-    if (!_formKey.currentState!.validate() || _selectedCropId == null || _predictionDate == null) {
+    if (!_formKey.currentState!.validate() || _selectedCropId == null || _selectedMarketGovId == null || _predictionDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.translate('required_field'))));
       return;
     }
@@ -105,12 +121,14 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
     
     try {
       final selectedCrop = _allCrops.firstWhere((c) => c.id == _selectedCropId);
+      final marketGov = _governorates.firstWhere((g) => g.id == _selectedMarketGovId);
       final backendUrl = dotenv.env['BACKEND_URL'];
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       
-      var request = http.MultipartRequest('POST', Uri.parse('$backendUrl/predict_demand_level?t=$timestamp'));
+      var request = http.MultipartRequest('POST', Uri.parse('$backendUrl/predict_demand?t=$timestamp'));
       request.fields['crop_name'] = selectedCrop.nameEn;
-      request.fields['prediction_date'] = DateFormat('yyyy-MM-dd').format(_predictionDate!);
+      request.fields['market_location'] = _mapGovernorateToMarket(marketGov.nameEn);
+      request.fields['sale_date'] = DateFormat('yyyy-MM-dd').format(_predictionDate!);
       if (_userGov != null) {
         request.fields['governorate'] = _userGov!.nameEn;
       }
@@ -126,7 +144,7 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
         final errorBody = json.decode(response.body);
         String errorMessage = errorBody['detail'] is List 
             ? (errorBody['detail'] as List).map((e) => e['msg']).join(', ')
-            : errorBody['detail'].toString();
+            : errorBody['detail']?.toString() ?? 'Prediction failed';
         throw Exception(errorMessage);
       }
     } catch (e) {
@@ -162,6 +180,7 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
     }
 
     final selectedCrop = _allCrops.firstWhere((c) => c.id == _selectedCropId);
+    final marketGov = _governorates.firstWhere((g) => g.id == _selectedMarketGovId);
 
     showModalBottomSheet(
       context: context,
@@ -191,6 +210,8 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
               const Divider(),
               const SizedBox(height: 24),
               _buildResultRow(Icons.grass_outlined, l10n.translate('crop'), '', darkGreen, trailing: _buildCropBadge(selectedCrop, lang, darkGreen)),
+              const SizedBox(height: 16),
+              _buildResultRow(Icons.shopping_cart_outlined, l10n.translate('market_location'), marketGov.getName(lang), darkGreen),
               const SizedBox(height: 16),
               _buildResultRow(Icons.calendar_today_outlined, l10n.translate('date'), DateFormat('yyyy-MM-dd').format(_predictionDate!), darkGreen),
               const SizedBox(height: 40),
@@ -232,6 +253,11 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
                     _buildReadonlyField(_userGov?.getName(lang) ?? '', Icons.location_on_outlined),
                     const SizedBox(height: 20),
 
+                    _buildLabel(l10n.translate('market_location'), darkGreen),
+                    const SizedBox(height: 8),
+                    _buildMarketDropdown(lang, l10n),
+                    const SizedBox(height: 20),
+
                     _buildLabel(l10n.translate('market_categories'), darkGreen),
                     const SizedBox(height: 8),
                     _buildCategoryDropdown(lang, l10n),
@@ -265,6 +291,20 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
   Widget _buildReadonlyField(String value, IconData icon) => TextFormField(initialValue: value, enabled: false, style: GoogleFonts.cairo(), decoration: InputDecoration(filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none), prefixIcon: Icon(icon)));
   Widget _buildCategoryDropdown(String lang, AppLocalizations l10n) => DropdownButtonFormField<int>(value: _selectedCategoryId, style: GoogleFonts.cairo(color: Colors.black), decoration: InputDecoration(hintText: l10n.translate('all_categories'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)), items: _categories.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.emoji} ${c.getName(lang)}', style: GoogleFonts.cairo()))).toList(), onChanged: _onCategoryChanged);
   Widget _buildCropDropdown(String lang, AppLocalizations l10n) => DropdownButtonFormField<int>(value: _selectedCropId, style: GoogleFonts.cairo(color: Colors.black), decoration: InputDecoration(hintText: l10n.translate('select_crop'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)), items: _filteredCrops.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.emoji} ${c.getName(lang)}', style: GoogleFonts.cairo()))).toList(), onChanged: (val) => setState(() => _selectedCropId = val), validator: (v) => v == null ? l10n.translate('required_field') : null);
+  
+  Widget _buildMarketDropdown(String lang, AppLocalizations l10n) => DropdownButtonFormField<int>(
+    value: _selectedMarketGovId, 
+    style: GoogleFonts.cairo(color: Colors.black), 
+    decoration: InputDecoration(
+      hintText: l10n.translate('select_market'), 
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)), 
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+    ), 
+    items: _governorates.map((g) => DropdownMenuItem(value: g.id, child: Text(g.getName(lang), style: GoogleFonts.cairo()))).toList(), 
+    onChanged: (val) => setState(() => _selectedMarketGovId = val), 
+    validator: (v) => v == null ? l10n.translate('required_field') : null
+  );
+
   Widget _buildDatePicker(DateTime? date, VoidCallback onTap, Color primary, Color dark, AppLocalizations l10n) => InkWell(onTap: onTap, child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, border: Border.all(color: date == null ? Colors.grey.shade300 : primary), borderRadius: BorderRadius.circular(15)), child: Row(children: [Icon(Icons.calendar_today, size: 18, color: date == null ? Colors.grey : primary), const SizedBox(width: 8), Expanded(child: Text(date == null ? l10n.translate('select_date') : DateFormat('yyyy-MM-dd').format(date), style: GoogleFonts.cairo(fontSize: 13)))])));
   Widget _buildSubmitButton(String text, Color color) => SizedBox(width: double.infinity, height: 55, child: ElevatedButton(onPressed: _isPredicting ? null : _submitPrediction, style: ElevatedButton.styleFrom(backgroundColor: color, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 0), child: Text(text, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16))));
 }

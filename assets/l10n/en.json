@@ -168,7 +168,7 @@
   "high": "High",
   "jod_per_kg": "JOD / kg",
   "kg": "kg",
-  "m3": "m³",
+  "m3": "m\u00b3",
   "load_more": "Load More",
   "show_all": "Show All",
   "overall_sufficiency": "Overall Sufficiency",
@@ -253,7 +253,7 @@
   "share_app": "Share App",
   "share_hasaad": "Share Hasaad with other farmers",
   "share": "Share",
-  "share_message": "Try Hasaad app to help farmers plan and make better decisions 🌱 Download now: https://hasaad.app",
+  "share_message": "Try Hasaad app to help farmers plan and make better decisions \ud83c\udf31 Download now: https://hasaad.app",
   "help_others_grow": "Help others grow their farms",
   "farming_condition": "Farming Condition",
   "best_planting_time": "Best Planting Time",
@@ -304,5 +304,14 @@
   "no_data_chart": "No data available for this chart.",
   "refresh_hint": "Added a plan and it isn't showing? Tap here to refresh.",
   "sort_area": "Area (High to Low)",
-  "sort_share": "Share (High to Low)"
+  "sort_share": "Share (High to Low)",
+  "onboarding_title_1": "Solve Oversupply",
+  "onboarding_desc_1": "Join a collective planting plan to stabilize the market. Hasaad helps you know what to plant and when to avoid market surplus.",
+  "onboarding_title_2": "AI Farming Assistant",
+  "onboarding_desc_2": "Predict prices, yields, and demand with advanced AI. Get personalized advice based on real-time market data.",
+  "onboarding_title_3": "Complete Farm Management",
+  "onboarding_desc_3": "Manage your tasks, track financials, find workers, and monitor your farm's performance in one place.",
+  "next": "Next",
+  "get_started": "Get Started",
+  "skip": "Skip"
 }

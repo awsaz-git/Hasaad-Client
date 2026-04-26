@@ -33,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
       try {
         authResponse = await _service.signIn(_idController.text, _passwordController.text);
       } catch (e) {
-        print("Login attempt failed: $e");
+        debugPrint("Login attempt failed: $e");
       }
       
       if (authResponse == null || authResponse.user == null) {
@@ -89,8 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    const darkGreen = Color(0xFF005E4D);
-    const primaryGreen = Color(0xFF00C897);
+    const darkGreen = Color(0xFF015E54);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -136,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 10),
-              Image.asset('assets/logo with text.png', height: 180), // Made logo bigger (was 120)
+              Image.asset('assets/logo with text.png', height: 180),
               const SizedBox(height: 30),
               Text(
                 l10n.translate('login'),
@@ -197,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryGreen,
+                          backgroundColor: darkGreen,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: 0,
                         ),
