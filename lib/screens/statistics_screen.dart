@@ -4,6 +4,7 @@ import '../models/planting_plan.dart';
 import '../models/crop.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
+import 'home_screen.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -22,6 +23,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // Switch to My Plans tab (index 3) whenever this screen is entered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      homeScreenKey.currentState?.setSelectedIndex(3);
+    });
   }
 
   Future<void> _loadData() async {

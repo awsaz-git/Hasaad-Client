@@ -45,8 +45,8 @@ class _HasaadAppState extends State<HasaadApp> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF00C897);
-    const darkGreen = Color(0xFF005E4D);
+    // Reverted to simple theme based on brand color #015E54
+    const brandGreen = Color(0xFF015E54);
 
     return MaterialApp(
       title: 'Hasaad',
@@ -54,16 +54,16 @@ class _HasaadAppState extends State<HasaadApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: darkGreen,
-          primary: primaryGreen,
-          secondary: darkGreen,
+          seedColor: brandGreen,
+          primary: brandGreen,
+          secondary: brandGreen,
           surface: Colors.white,
         ),
         textTheme: GoogleFonts.cairoTextTheme(),
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: primaryGreen,
+            backgroundColor: brandGreen,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18),
@@ -71,6 +71,8 @@ class _HasaadAppState extends State<HasaadApp> {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
+            foregroundColor: brandGreen,
+            side: const BorderSide(color: brandGreen),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold),
           ),
@@ -88,9 +90,9 @@ class _HasaadAppState extends State<HasaadApp> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: primaryGreen, width: 2),
+            borderSide: const BorderSide(color: brandGreen, width: 2),
           ),
-          labelStyle: GoogleFonts.cairo(color: darkGreen),
+          labelStyle: GoogleFonts.cairo(color: brandGreen),
           hintStyle: GoogleFonts.cairo(color: Colors.grey),
         ),
       ),
@@ -189,7 +191,7 @@ class _AuthCheckState extends State<AuthCheck> {
     if (_checking || _targetScreen == null) {
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF00C897)),
+          child: CircularProgressIndicator(color: Color(0xFF015E54)),
         ),
       );
     }

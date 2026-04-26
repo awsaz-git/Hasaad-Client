@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_localizations.dart';
+import '../utils/app_theme.dart';
 import '../services/supabase_service.dart';
 import 'profile_screen.dart';
 import 'home_dashboard.dart';
@@ -8,6 +9,7 @@ import 'statistics_page.dart';
 import 'notifications_screen.dart';
 import 'calendar_screen.dart';
 import 'ai_screen.dart';
+import 'jobs_screen.dart';
 
 // Global key to access HomeScreen state from anywhere
 final GlobalKey<HomeScreenState> homeScreenKey = GlobalKey<HomeScreenState>();
@@ -20,16 +22,27 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final _service = SupabaseService();
   int _selectedIndex = 0;
   int _unreadNotifications = 0;
   Key _refreshKey = UniqueKey();
+  late AnimationController _glowController;
 
   @override
   void initState() {
     super.initState();
     _checkNotifications();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
   }
 
   void refreshApp() {
@@ -37,6 +50,14 @@ class HomeScreenState extends State<HomeScreen> {
       setState(() {
         _refreshKey = UniqueKey();
         _checkNotifications();
+      });
+    }
+  }
+
+  void setSelectedIndex(int index) {
+    if (mounted) {
+      setState(() {
+        _selectedIndex = index;
       });
     }
   }
@@ -58,23 +79,22 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _onViewPlans() {
-    setState(() {
-      _selectedIndex = 3; // Index for StatisticsPage
-    });
+    setSelectedIndex(3); // Index for StatisticsPage
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    const darkGreen = Color(0xFF005E4D);
-    const primaryGreen = Color(0xFF00C897);
+    final theme = Theme.of(context);
+    const primaryColor = AppTheme.primary;
+    const aiAccent = Color(0xFF00C897);
 
     final List<Widget> screens = [
       HomeDashboard(onViewPlans: _onViewPlans),
       const CalendarScreen(),
       const AiScreen(),
       const StatisticsPage(),
-      const PlaceholderScreen(title: 'jobs'),
+      const JobsScreen(),
     ];
 
     void goToProfile() {
@@ -89,35 +109,26 @@ class HomeScreenState extends State<HomeScreen> {
         context,
         MaterialPageRoute(builder: (_) => const NotificationsScreen()),
       );
-      _checkNotifications(); // Refresh count when coming back
+      _checkNotifications();
     }
-
-    // Explicitly layout Left and Right
-    Widget profileBtn = IconButton(
-      icon: const Icon(Icons.account_circle_outlined, color: darkGreen, size: 28), 
-      onPressed: goToProfile
-    );
-
-    Widget notificationBtn = _buildNotificationBtn(goToNotifications, darkGreen, false);
 
     Widget headerButtons = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Stack(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Align(alignment: Alignment.centerLeft, child: profileBtn),
-          Align(alignment: Alignment.centerRight, child: notificationBtn),
+          _buildTopBtn(Icons.account_circle_outlined, goToProfile, primaryColor),
+          _buildNotificationBtn(goToNotifications, primaryColor),
         ],
       ),
     );
-
-    final bool isAiSelected = _selectedIndex == 2;
 
     return Scaffold(
       key: _refreshKey,
       appBar: _selectedIndex == 0 
         ? null 
         : AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.surface,
             elevation: 0,
             automaticallyImplyLeading: false,
             titleSpacing: 0,
@@ -126,7 +137,7 @@ class HomeScreenState extends State<HomeScreen> {
       body: Stack(
         children: [
           IndexedStack(
-            key: ValueKey(_refreshKey), // Force IndexedStack rebuild
+            key: ValueKey(_refreshKey),
             index: _selectedIndex,
             children: screens,
           ),
@@ -134,37 +145,61 @@ class HomeScreenState extends State<HomeScreen> {
             Positioned(
               top: 50,
               left: 20,
-              child: _buildFloatingBtn(Icons.account_circle_outlined, goToProfile, darkGreen),
+              child: _buildFloatingBtn(Icons.account_circle_outlined, goToProfile, primaryColor),
             ),
             Positioned(
               top: 50,
               right: 20,
-              child: _buildNotificationBtn(goToNotifications, darkGreen, true),
+              child: _buildNotificationBtn(goToNotifications, primaryColor, isFloating: true),
             ),
           ],
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AnimatedContainer(
-        duration: const Duration(milliseconds: 400),
-        height: 70,
-        width: 70,
-        margin: const EdgeInsets.only(top: 30),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: isAiSelected ? [
-            BoxShadow(color: primaryGreen.withOpacity(0.6), blurRadius: 25, spreadRadius: 8),
-            BoxShadow(color: primaryGreen.withOpacity(0.3), blurRadius: 45, spreadRadius: 15),
-          ] : [
-            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
-        ),
+      floatingActionButton: AnimatedBuilder(
+        animation: _glowController,
+        builder: (context, child) {
+          bool isSelected = _selectedIndex == 2;
+          return Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: Color.lerp(
+                    aiAccent.withValues(alpha: 0.3), 
+                    aiAccent.withValues(alpha: 0.7), 
+                    _glowController.value
+                  )!,
+                  blurRadius: 15 + (15 * _glowController.value),
+                  spreadRadius: 4 + (6 * _glowController.value),
+                )
+              ] : [],
+            ),
+            child: child,
+          );
+        },
         child: FloatingActionButton(
+          heroTag: 'ai_assistant_fab',
           onPressed: () => setState(() => _selectedIndex = 2),
-          backgroundColor: isAiSelected ? primaryGreen : darkGreen,
+          backgroundColor: primaryColor,
           shape: const CircleBorder(),
-          elevation: 0,
-          child: const Icon(Icons.auto_awesome, color: Colors.white, size: 35),
+          elevation: _selectedIndex == 2 ? 0 : 4,
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: _selectedIndex == 2 ? const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [AppTheme.primary, aiAccent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ) : const BoxDecoration(
+              shape: BoxShape.circle,
+              color: primaryColor,
+            ),
+            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 32),
+          ),
         ),
       ),
       bottomNavigationBar: BottomAppBar(
@@ -176,14 +211,20 @@ class HomeScreenState extends State<HomeScreen> {
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: primaryGreen,
-          unselectedItemColor: Colors.grey,
+          backgroundColor: theme.colorScheme.surface,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: Colors.grey[400],
           elevation: 0,
           selectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 10),
           unselectedLabelStyle: GoogleFonts.cairo(fontSize: 10),
           items: [
-            BottomNavigationBarItem(icon: const Icon(Icons.grass_outlined), activeIcon: const Icon(Icons.grass), label: l10n.translate('home')),
+            BottomNavigationBarItem(
+              icon: Opacity(
+                opacity: _selectedIndex == 0 ? 1.0 : 0.6,
+                child: Image.asset("assets/logo no text - nav bar.png", width: 22, height: 22, color: _selectedIndex == 0 ? primaryColor : Colors.grey[400])
+              ),
+              label: l10n.translate('home')
+            ),
             BottomNavigationBarItem(icon: const Icon(Icons.calendar_month_outlined), activeIcon: const Icon(Icons.calendar_month), label: l10n.translate('calendar')),
             const BottomNavigationBarItem(icon: Opacity(opacity: 0, child: Icon(Icons.circle)), label: ''),
             BottomNavigationBarItem(icon: const Icon(Icons.bar_chart_outlined), activeIcon: const Icon(Icons.bar_chart), label: l10n.translate('statistics')),
@@ -194,6 +235,10 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildTopBtn(IconData icon, VoidCallback onTap, Color color) {
+    return IconButton(icon: Icon(icon, color: color, size: 28), onPressed: onTap);
+  }
+
   Widget _buildFloatingBtn(IconData icon, VoidCallback onTap, Color color) {
     return GestureDetector(
       onTap: onTap,
@@ -202,37 +247,28 @@ class HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Icon(icon, color: color, size: 28),
       ),
     );
   }
 
-  Widget _buildNotificationBtn(VoidCallback onTap, Color color, bool isFloating) {
+  Widget _buildNotificationBtn(VoidCallback onTap, Color color, {bool isFloating = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          isFloating 
-            ? Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Icon(Icons.notifications_none, color: color, size: 28),
-              )
-            : Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.notifications_none, color: color, size: 28),
-              ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: isFloating ? BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+            ) : null,
+            child: Icon(Icons.notifications_none, color: color, size: 28),
+          ),
           if (_unreadNotifications > 0)
             Positioned(
               top: isFloating ? -2 : 4,
@@ -248,32 +284,6 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            l10n.translate(title),
-            style: GoogleFonts.cairo(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF005E4D)),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            l10n.translate('coming_soon'),
-            style: GoogleFonts.cairo(color: Colors.grey),
-          ),
         ],
       ),
     );

@@ -107,9 +107,9 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF00C897),
+              primary: Color(0xFF015E54), // Dark Green
               onPrimary: Colors.white,
-              onSurface: Color(0xFF005E4D),
+              onSurface: Color(0xFF015E54),
             ),
           ),
           child: child!,
@@ -167,8 +167,8 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
           SnackBar(content: Text(l10n.translate('plan_added_success'))),
         );
         
-        // Refresh the whole app state using the global key
         homeScreenKey.currentState?.refreshApp();
+        homeScreenKey.currentState?.setSelectedIndex(3); // Set index to Stats page (Plans tab)
 
         Navigator.pop(context, true);
       }
@@ -187,8 +187,7 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final lang = Localizations.localeOf(context).languageCode;
-    const darkGreen = Color(0xFF005E4D);
-    const primaryGreen = Color(0xFF00C897);
+    const darkGreen = Color(0xFF015E54); // Consistent dark green
 
     final enteredArea = double.tryParse(_areaController.text) ?? 0;
     final bool isAreaValid = enteredArea > 0 && enteredArea <= _availableArea;
@@ -204,7 +203,7 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
         iconTheme: const IconThemeData(color: darkGreen),
       ),
       body: _isLoading && _profile == null 
-        ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+        ? const Center(child: CircularProgressIndicator(color: darkGreen))
         : SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -243,6 +242,7 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                 decoration: InputDecoration(
                   hintText: l10n.translate('all_categories'),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                  prefixIcon: const Icon(Icons.category_outlined, color: darkGreen),
                 ),
                 items: _categories.map((c) => DropdownMenuItem(
                   value: c.id,
@@ -257,7 +257,10 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   value: _selectedCropId,
-                  decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                    prefixIcon: const Icon(Icons.grass_outlined, color: darkGreen),
+                  ),
                   items: _filteredCrops.map((c) => DropdownMenuItem(
                     value: c.id,
                     child: Text('${c.emoji} ${c.getName(lang)}', style: GoogleFonts.cairo()),
@@ -276,7 +279,7 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                     Text(
                       '${l10n.translate('area_remaining')}: ${_remainingArea.toStringAsFixed(1)}',
                       style: GoogleFonts.cairo(
-                        color: _remainingArea < 0 ? Colors.red : primaryGreen,
+                        color: _remainingArea < 0 ? Colors.red : darkGreen,
                         fontWeight: FontWeight.bold,
                         fontSize: 12
                       ),
@@ -293,7 +296,11 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                   hintText: l10n.translate('placeholder_area'),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
                   suffixText: l10n.translate('dunums'),
-                  prefixIcon: const Icon(Icons.square_foot, color: primaryGreen),
+                  prefixIcon: const Icon(Icons.square_foot, color: darkGreen),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: const BorderSide(color: darkGreen, width: 2),
+                  ),
                 ),
                 validator: (v) {
                   final basic = Validators.validateLandSize(v, l10n.translate('invalid_land_size'));
@@ -319,12 +326,12 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              border: Border.all(color: _plantingDate == null ? Colors.grey.shade300 : primaryGreen),
+                              border: Border.all(color: _plantingDate == null ? Colors.grey.shade300 : darkGreen, width: _plantingDate == null ? 1 : 2),
                               borderRadius: BorderRadius.circular(15),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.calendar_today, size: 18, color: _plantingDate == null ? Colors.grey : primaryGreen),
+                                Icon(Icons.calendar_today, size: 18, color: _plantingDate == null ? Colors.grey : darkGreen),
                                 const SizedBox(width: 8),
                                 Expanded(child: Text(
                                   _plantingDate == null ? l10n.translate('select_date') : DateFormat('yyyy-MM-dd').format(_plantingDate!), 
@@ -350,12 +357,12 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              border: Border.all(color: _harvestDate == null ? Colors.grey.shade300 : primaryGreen),
+                              border: Border.all(color: _harvestDate == null ? Colors.grey.shade300 : darkGreen, width: _harvestDate == null ? 1 : 2),
                               borderRadius: BorderRadius.circular(15),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.calendar_today, size: 18, color: _harvestDate == null ? Colors.grey : primaryGreen),
+                                Icon(Icons.calendar_today, size: 18, color: _harvestDate == null ? Colors.grey : darkGreen),
                                 const SizedBox(width: 8),
                                 Expanded(child: Text(
                                   _harvestDate == null ? l10n.translate('select_date') : DateFormat('yyyy-MM-dd').format(_harvestDate!), 
@@ -377,7 +384,7 @@ class _AddPlanScreenState extends State<AddPlanScreen> {
                 child: ElevatedButton(
                   onPressed: canSubmit ? _submit : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: canSubmit ? primaryGreen : Colors.grey[400],
+                    backgroundColor: canSubmit ? darkGreen : Colors.grey[400],
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     elevation: canSubmit ? 5 : 0,
                   ),

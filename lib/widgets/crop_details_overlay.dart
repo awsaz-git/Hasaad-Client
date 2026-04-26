@@ -6,10 +6,20 @@ import '../models/crop_supply.dart';
 import '../models/governorate.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
+import '../utils/app_theme.dart';
 
 class CropDetailsOverlay extends StatefulWidget {
   final Crop crop;
   const CropDetailsOverlay({super.key, required this.crop});
+
+  static void show(BuildContext context, Crop crop, double supply, double demand) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CropDetailsOverlay(crop: crop),
+    );
+  }
 
   @override
   State<CropDetailsOverlay> createState() => _CropDetailsOverlayState();
@@ -48,24 +58,30 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
   }
 
   Color _getRatioColor(double ratio) {
-    if (ratio <= 40) return const Color(0xFF00C897); // Dark Green (Good)
-    if (ratio <= 75) return const Color(0xFF8BC34A); // Light Green
-    if (ratio <= 90) return const Color(0xFFFFC107); // Yellow/Amber
-    if (ratio <= 100) return const Color(0xFFFF9800); // Orange
-    return const Color(0xFFF44336); // Red (Oversupply)
+    if (ratio <= 40) return AppTheme.primary;
+    if (ratio <= 75) return const Color(0xFF8BC34A); 
+    if (ratio <= 90) return const Color(0xFFFFC107);
+    if (ratio <= 100) return const Color(0xFFFF9800); 
+    return const Color(0xFFF44336);
+  }
+
+  String _getStatusLabelKey(double ratio) {
+    if (ratio <= 75) return 'good_opportunity';
+    if (ratio <= 90) return 'fair_opportunity';
+    return 'oversupply';
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final lang = Localizations.localeOf(context).languageCode;
-    const darkGreen = Color(0xFF005E4D);
+    const darkGreen = AppTheme.primary;
 
     final totalLocalSupply = _supplies.fold(0.0, (sum, s) => sum + s.totalEstimatedTons);
     final demandTons = _demand?.demandTons ?? 0;
     final ratio = demandTons > 0 ? (totalLocalSupply / demandTons) * 100 : 0.0;
-    final isGoodOpportunity = ratio < 100;
     final statusColor = _getRatioColor(ratio);
+    final statusLabelKey = _getStatusLabelKey(ratio);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
@@ -97,7 +113,7 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0F9F4),
+                    color: darkGreen.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(widget.crop.emoji, style: const TextStyle(fontSize: 32)),
@@ -112,9 +128,7 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
                         style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: darkGreen),
                       ),
                       Text(
-                        isGoodOpportunity 
-                            ? l10n.translate('good_opportunity') 
-                            : l10n.translate('oversupply'),
+                        l10n.translate(statusLabelKey),
                         style: GoogleFonts.cairo(
                           fontSize: 14,
                           color: statusColor,
@@ -134,7 +148,6 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
             if (_isLoading)
               const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
             else ...[
-              // Summary Section
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -167,7 +180,6 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
               ),
               const SizedBox(height: 32),
               
-              // Market Notes
               Text(l10n.translate('market_notes'), style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: darkGreen)),
               const SizedBox(height: 12),
               Container(
@@ -185,7 +197,6 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
               ),
               const SizedBox(height: 32),
               
-              // Regional Supply
               Text(l10n.translate('supply_by_governorate'), style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: darkGreen)),
               const SizedBox(height: 16),
               if (_supplies.isEmpty)
@@ -220,7 +231,7 @@ class _CropDetailsOverlayState extends State<CropDetailsOverlay> {
                                 value: govRatio.clamp(0.0, 1.0),
                                 minHeight: 6,
                                 backgroundColor: Colors.grey.shade100,
-                                valueColor: AlwaysStoppedAnimation<Color>(statusColor.withOpacity(0.6)),
+                                valueColor: AlwaysStoppedAnimation<Color>(statusColor.withValues(alpha: 0.6)),
                               ),
                             ),
                           ),

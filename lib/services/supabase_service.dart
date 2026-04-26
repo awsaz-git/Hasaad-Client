@@ -9,6 +9,8 @@ import '../models/crop_supply.dart';
 import '../models/task.dart';
 import '../models/reminder.dart';
 import '../models/notification.dart';
+import '../models/job.dart';
+import '../models/crop_financial.dart';
 import '../utils/app_localizations.dart';
 import 'notification_service.dart';
 
@@ -103,51 +105,61 @@ class SupabaseService {
   }
 
   Future<void> addPlantingPlan(PlantingPlan plan) async {
-    final planResponse = await _supabase.from('planting_plans').insert(plan.toJson()).select().single();
-    final insertedPlanId = planResponse['id'].toString();
+    try {
+      final planResponse = await _supabase.from('planting_plans').insert(plan.toJson()).select().single();
+      final insertedPlanId = planResponse['id'].toString();
 
-    await _updateCropSupply(
-      cropId: plan.cropId,
-      governorateId: plan.governorateId,
-      areaDelta: plan.areaDonums,
-      yieldDelta: plan.estimatedYieldTons ?? 0.0,
-      countDelta: 1,
-    );
+      await _updateCropSupply(
+        cropId: plan.cropId,
+        governorateId: plan.governorateId,
+        areaDelta: plan.areaDonums,
+        yieldDelta: plan.estimatedYieldTons ?? 0.0,
+        countDelta: 1,
+      );
 
-    final crops = await getCrops();
-    final crop = crops.firstWhere((c) => c.id == plan.cropId);
-    
-    // Create localized tasks for planting and harvesting
-    await addTask(Task(
-      farmerId: plan.farmerId,
-      title: 'plant_crop', // We use keys for auto tasks now
-      description: crop.id.toString(), // Store crop id in description for translation if needed, or just use naming convention
-      taskDate: plan.plantingDate,
-      plantingPlanId: insertedPlanId,
-    ), reminderTime: DateTime(plan.plantingDate.year, plan.plantingDate.month, plan.plantingDate.day, 8, 0));
+      final crops = await getCrops();
+      final crop = crops.firstWhere((c) => c.id == plan.cropId);
+      
+      // Create localized tasks for planting and harvesting
+      await addTask(Task(
+        farmerId: plan.farmerId,
+        title: 'plant_crop', 
+        description: crop.id.toString(),
+        taskDate: plan.plantingDate,
+        plantingPlanId: insertedPlanId,
+      ), reminderTime: DateTime(plan.plantingDate.year, plan.plantingDate.month, plan.plantingDate.day, 8, 0));
 
-    await addTask(Task(
-      farmerId: plan.farmerId,
-      title: 'harvest_crop',
-      description: crop.id.toString(),
-      taskDate: plan.harvestDate,
-      plantingPlanId: insertedPlanId,
-    ), reminderTime: DateTime(plan.harvestDate.year, plan.harvestDate.month, plan.harvestDate.day, 8, 0));
+      await addTask(Task(
+        farmerId: plan.farmerId,
+        title: 'harvest_crop',
+        description: crop.id.toString(),
+        taskDate: plan.harvestDate,
+        plantingPlanId: insertedPlanId,
+      ), reminderTime: DateTime(plan.harvestDate.year, plan.harvestDate.month, plan.harvestDate.day, 8, 0));
+    } catch (e) {
+      print('Postgres error in addPlantingPlan: $e');
+      rethrow;
+    }
   }
 
   Future<void> updatePlanStatusWithSupply(PlantingPlan plan, String newStatus) async {
     if (plan.status == newStatus) return;
 
-    await _supabase.from('planting_plans').update({'status': newStatus}).eq('id', plan.id!);
+    try {
+      await _supabase.from('planting_plans').update({'status': newStatus}).eq('id', plan.id!);
 
-    if (plan.status == 'active' && (newStatus == 'cancelled' || newStatus == 'harvested')) {
-      await _updateCropSupply(
-        cropId: plan.cropId,
-        governorateId: plan.governorateId,
-        areaDelta: -plan.areaDonums,
-        yieldDelta: -(plan.estimatedYieldTons ?? 0.0),
-        countDelta: -1,
-      );
+      if (plan.status == 'active' && (newStatus == 'cancelled' || newStatus == 'harvested')) {
+        await _updateCropSupply(
+          cropId: plan.cropId,
+          governorateId: plan.governorateId,
+          areaDelta: -plan.areaDonums,
+          yieldDelta: -(plan.estimatedYieldTons ?? 0.0),
+          countDelta: -1,
+        );
+      }
+    } catch (e) {
+      print('Postgres error in updatePlanStatusWithSupply: $e');
+      rethrow;
     }
   }
 
@@ -223,7 +235,6 @@ class SupabaseService {
   }
 
   Future<void> deleteTask(String taskId) async {
-    // Foreign key with ON DELETE CASCADE should handle reminders
     await _supabase.from('tasks').delete().eq('id', taskId);
   }
 
@@ -252,7 +263,6 @@ class SupabaseService {
       String title = task.title;
       String body = task.description ?? '';
 
-      // Localize if it's an auto-task
       if (task.title == 'plant_crop' || task.title == 'harvest_crop') {
         final cropId = int.tryParse(task.description ?? '') ?? 0;
         final crop = crops.firstWhere((c) => c.id == cropId, orElse: () => crops.first);
@@ -264,7 +274,6 @@ class SupabaseService {
         title = '${l10n.translate('reminder')}: ${task.title}';
       }
 
-      // 1. Create in-app notification
       await _supabase.from('notifications').insert({
         'farmer_id': user.id,
         'title': title,
@@ -272,13 +281,11 @@ class SupabaseService {
         'is_read': false,
       });
 
-      // 2. Trigger System Push Notification
       await NotificationService().showNotification(
         title: title,
         body: body,
       );
 
-      // 3. Mark reminder as sent
       await _supabase.from('reminders').update({'is_sent': true}).eq('id', item['id']);
     }
   }
@@ -309,6 +316,17 @@ class SupabaseService {
     return supplyMap;
   }
 
+  Future<Map<int, double>> getTotalCropSupplyMap() async {
+    final supplyTable = await _supabase.from('crop_supply').select();
+    Map<int, double> totalSupplyMap = {};
+    for (var item in supplyTable) {
+      int cropId = item['crop_id'];
+      double supply = (item['total_estimated_tons'] as num).toDouble();
+      totalSupplyMap[cropId] = (totalSupplyMap[cropId] ?? 0) + supply;
+    }
+    return totalSupplyMap;
+  }
+
   Future<List<CropSupply>> getDetailedCropSupply(int cropId) async {
     final response = await _supabase.from('crop_supply').select().eq('crop_id', cropId);
     return (response as List).map((json) => CropSupply.fromJson(json)).toList();
@@ -327,6 +345,76 @@ class SupabaseService {
       demandMap[item['crop_id']] = (item['demand_tons'] as num).toDouble();
     }
     return demandMap;
+  }
+
+  // --- Jobs ---
+
+  Future<List<Job>> getMyJobs(String userId) async {
+    final response = await _supabase
+        .from('jobs')
+        .select()
+        .eq('farmer_id', userId)
+        .order('created_at', ascending: false);
+    return (response as List).map((json) => Job.fromJson(json)).toList();
+  }
+
+  Future<void> createJob(Job job) async {
+    await _supabase.from('jobs').insert(job.toJson());
+  }
+
+  Future<void> updateJob(Job job) async {
+    await _supabase.from('jobs').update(job.toJson()).eq('id', job.id!);
+  }
+
+  Future<void> closeJob(String jobId) async {
+    await _supabase.from('jobs').update({'is_active': false}).eq('id', jobId);
+  }
+
+  Future<List<JobApplicant>> getJobApplicants(String jobId) async {
+    final response = await _supabase
+        .from('job_applicants')
+        .select()
+        .eq('job_id', jobId)
+        .order('created_at', ascending: false);
+    return (response as List).map((json) => JobApplicant.fromJson(json)).toList();
+  }
+
+  // --- Financial Insights ---
+
+  Future<List<CropFinancial>> getCropFinancials(String userId) async {
+    final response = await _supabase
+        .from('crop_financials')
+        .select()
+        .eq('farmer_id', userId);
+    return (response as List).map((json) => CropFinancial.fromJson(json)).toList();
+  }
+
+  Future<void> upsertCropFinancial(CropFinancial financial) async {
+    final existing = await _supabase
+        .from('crop_financials')
+        .select()
+        .eq('farmer_id', financial.farmerId)
+        .eq('crop_id', financial.cropId)
+        .maybeSingle();
+
+    if (existing != null) {
+      await _supabase
+          .from('crop_financials')
+          .update(financial.toJson())
+          .eq('id', existing['id']);
+    } else {
+      await _supabase.from('crop_financials').insert(financial.toJson());
+    }
+  }
+
+  // --- Suggestions ---
+
+  Future<void> submitSuggestion(String userId, String title, String description) async {
+    await _supabase.from('suggestions').insert({
+      'farmer_id': userId,
+      'title': title,
+      'description': description,
+    });
   }
 
   Future<void> signOut() async {

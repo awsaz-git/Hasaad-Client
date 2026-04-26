@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/profile.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
 import 'login_screen.dart';
+import 'suggest_feature_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Function(Locale) onLanguageChange;
@@ -37,11 +39,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _shareApp() {
+    final l10n = AppLocalizations.of(context)!;
+    Share.share(l10n.translate('share_message'));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    const darkGreen = Color(0xFF005E4D);
+    const darkGreen = Color(0xFF015E54);
 
     return Scaffold(
       appBar: AppBar(
@@ -59,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  border: Border.all(color: darkGreen.withOpacity(0.2)),
+                  border: Border.all(color: darkGreen.withValues(alpha: 0.2)),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Text(
@@ -72,18 +79,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: darkGreen))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
                   const CircleAvatar(
                     radius: 50,
-                    backgroundColor: Color(0xFFF0F0F0),
-                    child: Icon(Icons.person, size: 60, color: darkGreen),
+                    backgroundColor: darkGreen,
+                    child: Icon(Icons.person, size: 60, color: Colors.white),
                   ),
                   const SizedBox(height: 24),
                   _buildInfoCard(l10n),
+                  const SizedBox(height: 24),
+                  
+                  // Suggestion Feature Section
+                  _buildMenuCard(
+                    l10n.translate('request_feature'),
+                    Icons.lightbulb_outline,
+                    Colors.orangeAccent, // Changed to Yellow/Gold for consistency
+                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SuggestFeatureScreen())),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Share App Section
+                  _buildMenuCard(
+                    l10n.translate('share_app'),
+                    Icons.share_outlined,
+                    Colors.blue,
+                    _shareApp,
+                  ),
+
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
@@ -92,7 +118,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onPressed: () async {
                         await _service.signOut();
                         if (mounted) {
-                          // Explicitly navigate to Login and clear the stack
                           Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                             MaterialPageRoute(
                               builder: (context) => LoginScreen(onLanguageChange: widget.onLanguageChange),
@@ -115,6 +140,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildMenuCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 10)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -122,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 10)),
         ],
       ),
       child: Column(

@@ -25,6 +25,9 @@ dependencies:
   geolocator: ^12.0.0
   table_calendar: ^3.1.2
   flutter_local_notifications: ^17.2.2
+  shared_preferences: ^2.5.2
+  share_plus: ^10.1.4
+  fl_chart: ^0.71.0
 
 dev_dependencies:
   flutter_test:
@@ -43,7 +46,11 @@ flutter:
   assets:
     - .env
     - assets/l10n/
-    - assets/logo with text.png
+    - "assets/logo no text.png"
+    - "assets/logo with text.png"
+    - "assets/logo no text - white.png"
+    - "assets/logo with text - white.png"
+    - "assets/logo no text - nav bar.png"
     - assets/splash_icon.jpg
 
 flutter_launcher_icons:

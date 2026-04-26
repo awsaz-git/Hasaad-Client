@@ -5,6 +5,7 @@ import '../models/task.dart';
 import '../models/crop.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
+import '../utils/app_theme.dart';
 import 'add_task_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -132,13 +133,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context).toString();
-    const darkGreen = Color(0xFF005E4D);
-    const primaryGreen = Color(0xFF00C897);
+    const darkGreen = AppTheme.primary;
+    const taskMarkerYellow = Colors.orangeAccent; // Matching the yellow/orange in the suggestion icon
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _fetchAllTasks,
-        color: primaryGreen,
+        color: darkGreen, // Changed from primaryGreen (light) to darkGreen
         child: Column(
           children: [
             TableCalendar(
@@ -158,10 +159,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 });
               },
               calendarStyle: const CalendarStyle(
-                selectedDecoration: BoxDecoration(color: primaryGreen, shape: BoxShape.circle),
+                selectedDecoration: BoxDecoration(color: darkGreen, shape: BoxShape.circle),
                 todayDecoration: BoxDecoration(color: Color(0xFFE0F2F1), shape: BoxShape.circle),
                 todayTextStyle: TextStyle(color: darkGreen, fontWeight: FontWeight.bold),
-                markerDecoration: BoxDecoration(color: darkGreen, shape: BoxShape.circle),
+                markerDecoration: BoxDecoration(color: taskMarkerYellow, shape: BoxShape.circle), // Changed to yellow
                 markersMaxCount: 3,
               ),
               headerStyle: HeaderStyle(
@@ -173,7 +174,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             const Divider(),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+                  ? const Center(child: CircularProgressIndicator(color: darkGreen)) // Changed to darkGreen
                   : _tasksForSelectedDay.isEmpty
                       ? ListView( // Using ListView to make it scrollable for RefreshIndicator
                           children: [
@@ -200,7 +201,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               child: ListTile(
                                 leading: Checkbox(
                                   value: task.isCompleted,
-                                  activeColor: primaryGreen,
+                                  activeColor: darkGreen,
                                   onChanged: (_) => _toggleTask(task),
                                 ),
                                 title: Text(
@@ -218,7 +219,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (task.plantingPlanId != null) 
-                                      const Icon(Icons.grass, color: primaryGreen, size: 20),
+                                      const Icon(Icons.grass, color: darkGreen, size: 20),
                                     IconButton(
                                       icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                                       onPressed: () => _deleteTask(task),

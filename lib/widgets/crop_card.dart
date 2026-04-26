@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/crop.dart';
 import '../utils/app_localizations.dart';
+import '../utils/app_theme.dart';
 import 'crop_details_overlay.dart';
 
 class CropCard extends StatelessWidget {
@@ -16,25 +17,32 @@ class CropCard extends StatelessWidget {
     required this.demand,
   });
 
+  Color _getRatioColor(double ratio) {
+    if (ratio <= 40) return AppTheme.primary;
+    if (ratio <= 75) return const Color(0xFF8BC34A);
+    if (ratio <= 90) return const Color(0xFFFFC107);
+    if (ratio <= 100) return const Color(0xFFFF9800);
+    return const Color(0xFFF44336);
+  }
+
+  String _getStatusLabelKey(double ratio) {
+    if (ratio <= 75) return 'good_opportunity';
+    if (ratio <= 90) return 'fair_opportunity';
+    return 'oversupply';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final lang = Localizations.localeOf(context).languageCode;
-    const darkGreen = Color(0xFF005E4D);
-    
+    const darkGreen = AppTheme.primary;
+
     final ratio = demand > 0 ? (supply / demand) * 100 : 0.0;
-    final isGoodOpportunity = ratio < 100;
-    final statusColor = isGoodOpportunity ? const Color(0xFF00C897) : Colors.red;
+    final statusColor = _getRatioColor(ratio);
+    final statusLabelKey = _getStatusLabelKey(ratio);
 
     return GestureDetector(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (context) => CropDetailsOverlay(crop: crop),
-        );
-      },
+      onTap: () => CropDetailsOverlay.show(context, crop, supply, demand),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -77,9 +85,7 @@ class CropCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        isGoodOpportunity 
-                            ? l10n.translate('good_opportunity') 
-                            : l10n.translate('oversupply'),
+                        l10n.translate(statusLabelKey),
                         style: GoogleFonts.cairo(
                           fontSize: 12,
                           color: statusColor,

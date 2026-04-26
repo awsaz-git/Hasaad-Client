@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
+import '../utils/app_theme.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final DateTime initialDate;
@@ -96,13 +97,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    const darkGreen = Color(0xFF005E4D);
-    const primaryGreen = Color(0xFF00C897);
+    const darkGreen = AppTheme.primary;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          l10n.translate('add_task'), // Make sure this key exists in json
+          l10n.translate('add_task'),
           style: GoogleFonts.cairo(color: darkGreen, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -125,6 +125,10 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 controller: _titleController,
                 decoration: InputDecoration(
                   hintText: l10n.translate('enter_task_title'),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: darkGreen, width: 2),
+                  ),
                 ),
                 validator: (value) => (value == null || value.isEmpty) ? l10n.translate('required_field') : null,
               ),
@@ -140,6 +144,10 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   hintText: l10n.translate('enter_task_desc'),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: darkGreen, width: 2),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -166,7 +174,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.calendar_today, size: 18, color: primaryGreen),
+                                const Icon(Icons.calendar_today, size: 18, color: darkGreen),
                                 const SizedBox(width: 10),
                                 Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
                               ],
@@ -197,7 +205,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.access_time, size: 18, color: primaryGreen),
+                                const Icon(Icons.access_time, size: 18, color: darkGreen),
                                 const SizedBox(width: 10),
                                 Text(_reminderTime?.format(context) ?? l10n.translate('none')),
                               ],
@@ -217,7 +225,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _saveTask,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
+                    backgroundColor: darkGreen,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: _isSaving 
