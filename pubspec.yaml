@@ -51,6 +51,9 @@ flutter:
     - "assets/logo no text - white.png"
     - "assets/logo with text - white.png"
     - "assets/logo no text - nav bar.png"
+    - "assets/onboarding-1.avif"
+    - "assets/onboarding-2.avif"
+    - "assets/onboarding-3.avif"
     - assets/splash_icon.jpg
 
 flutter_launcher_icons:

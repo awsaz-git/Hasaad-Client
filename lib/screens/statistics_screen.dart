@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../models/planting_plan.dart';
 import '../models/crop.dart';
 import '../services/supabase_service.dart';
@@ -30,6 +31,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
       final user = _service.currentUser;
       if (user == null) return;
@@ -49,18 +52,59 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
-  /// Logic to handle status changes (Harvest/Cancel)
   Future<void> _handleStatusChange(PlantingPlan plan, String newStatus) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.translate('confirm')),
+        content: Text(newStatus == 'cancelled' ? l10n.translate('confirm_cancel') : l10n.translate('confirm_harvest')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.translate('cancel'))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.translate('confirm'))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     setState(() => _isLoading = true);
     try {
-      // Rule: This method handles database update AND supply subtraction if needed
-      await _service.updatePlanStatusWithSupply(plan, newStatus);
-      await _loadData(); // Refresh list
+      await _service.updatePlanStatus(plan.id!, newStatus);
+      await _loadData();
+      homeScreenKey.currentState?.refreshApp();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update status')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleDeletePlan(String planId) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.translate('confirm_delete')),
+        content: Text(l10n.translate('confirm_delete_pln_desc')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.translate('cancel'))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.translate('delete'), style: const TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _service.deletePlantingPlan(planId);
+      await _loadData();
+      homeScreenKey.currentState?.refreshApp();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         setState(() => _isLoading = false);
       }
     }
@@ -96,45 +140,53 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       );
 
                       final isHarvestable = plan.status == 'active' && 
-                          DateTime.now().isAfter(plan.harvestDate.subtract(const Duration(days: 7)));
+                          DateTime.now().isAfter(plan.harvestDate.subtract(const Duration(days: 14)));
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: ExpansionTile(
                           leading: Text(crop.emoji, style: const TextStyle(fontSize: 24)),
-                          title: Text(crop.getName(lang), style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                          title: Row(
+                            children: [
+                              Expanded(child: Text(crop.getName(lang), style: GoogleFonts.cairo(fontWeight: FontWeight.bold))),
+                              if (plan.status == 'cancelled')
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                  onPressed: () => _handleDeletePlan(plan.id!),
+                                ),
+                            ],
+                          ),
                           subtitle: Text(
                             '${plan.areaDonums} ${l10n.translate('dunums')} • ${l10n.translate(plan.status)}', 
                             style: GoogleFonts.cairo(
                               fontSize: 12, 
-                              color: plan.status == 'active' ? Colors.green : Colors.grey
+                              color: plan.status == 'active' ? Colors.green : (plan.status == 'cancelled' ? Colors.red : Colors.blue)
                             )
                           ),
                           children: [
-                            if (plan.status == 'active')
+                            if (plan.status == 'active' || plan.status == 'draft')
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    // Cancel Button: Always allowed if active
                                     TextButton.icon(
                                       onPressed: () => _handleStatusChange(plan, 'cancelled'),
                                       icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                                      label: Text(l10n.translate('cancelled'), style: GoogleFonts.cairo(color: Colors.red)),
+                                      label: Text(l10n.translate('cancel_plan'), style: GoogleFonts.cairo(color: Colors.red)),
                                     ),
                                     const SizedBox(width: 8),
-                                    // Harvest Button: Allowed if within 7 days of harvest date
-                                    ElevatedButton.icon(
-                                      onPressed: isHarvestable ? () => _handleStatusChange(plan, 'harvested') : null,
-                                      icon: const Icon(Icons.grass, color: Colors.white),
-                                      label: Text(l10n.translate('harvested'), style: GoogleFonts.cairo(color: Colors.white)),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange,
-                                        disabledBackgroundColor: Colors.grey.shade300,
+                                    if (plan.status == 'active')
+                                      ElevatedButton.icon(
+                                        onPressed: isHarvestable ? () => _handleStatusChange(plan, 'harvested') : null,
+                                        icon: const Icon(Icons.grass, color: Colors.white),
+                                        label: Text(l10n.translate('mark_harvested'), style: GoogleFonts.cairo(color: Colors.white)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          disabledBackgroundColor: Colors.grey.shade300,
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -143,8 +195,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildDetailRow(l10n.translate('planting_date'), plan.plantingDate.toString().split(' ')[0]),
-                                  _buildDetailRow(l10n.translate('harvest_date'), plan.harvestDate.toString().split(' ')[0]),
+                                  _buildDetailRow(l10n.translate('planting_date'), DateFormat('yyyy-MM-dd').format(plan.plantingDate)),
+                                  _buildDetailRow(l10n.translate('harvest_date'), DateFormat('yyyy-MM-dd').format(plan.harvestDate)),
                                   _buildDetailRow(l10n.translate('expected_supply'), '${plan.estimatedYieldTons?.toStringAsFixed(1) ?? "0"} ${l10n.translate('tons')}'),
                                 ],
                               ),

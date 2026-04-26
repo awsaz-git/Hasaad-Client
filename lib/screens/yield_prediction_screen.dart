@@ -8,6 +8,7 @@ import '../models/crop.dart';
 import '../models/category.dart';
 import '../models/governorate.dart';
 import '../models/profile.dart';
+import '../models/planting_plan.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
 import '../utils/app_theme.dart';
@@ -31,6 +32,7 @@ class _YieldPredictionScreenState extends State<YieldPredictionScreen> {
   List<Crop> _allCrops = [];
   List<Crop> _filteredCrops = [];
   List<CropCategory> _categories = [];
+  List<PlantingPlan> _activePlans = [];
   
   int? _selectedCategoryId;
   int? _selectedCropId;
@@ -62,6 +64,7 @@ class _YieldPredictionScreenState extends State<YieldPredictionScreen> {
       final crops = await _service.getCrops();
       final categories = await _service.getCategories();
       final govs = await _service.getGovernorates();
+      final plans = await _service.getUserPlantingPlans(user.id);
       
       Governorate? myGov;
       if (profile != null) {
@@ -73,12 +76,83 @@ class _YieldPredictionScreenState extends State<YieldPredictionScreen> {
         _userGov = myGov;
         _allCrops = crops;
         _categories = categories;
+        _activePlans = plans.where((p) => p.status == 'active').toList();
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error loading initial data: $e');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _autofillFromPlans() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_activePlans.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.translate('no_active_plans'))));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.translate('autofill_select_plan'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _activePlans.length,
+                itemBuilder: (context, index) {
+                  final plan = _activePlans[index];
+                  final crop = _allCrops.firstWhere((c) => c.id == plan.cropId, orElse: () => _allCrops.first);
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _applyAutofill(plan);
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+                      child: Row(
+                        children: [
+                          Container(width: 50, height: 50, decoration: BoxDecoration(color: modelThemeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), alignment: Alignment.center, child: Text(crop.emoji, style: const TextStyle(fontSize: 28))),
+                          const SizedBox(width: 16),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(crop.getName(l10n.locale.languageCode), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text('${plan.areaDonums} ${l10n.translate('dunums')} • ${DateFormat('yyyy-MM-dd').format(plan.plantingDate)}', style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[600])),
+                          ])),
+                          const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyAutofill(PlantingPlan plan) {
+    final l10n = AppLocalizations.of(context)!;
+    final crop = _allCrops.firstWhere((c) => c.id == plan.cropId);
+    setState(() {
+      _selectedCategoryId = crop.categoryId;
+      _filteredCrops = _allCrops.where((c) => c.categoryId == crop.categoryId).toList();
+      _selectedCropId = plan.cropId;
+      _areaController.text = plan.areaDonums.toString();
+      _plantingDate = plan.plantingDate;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.translate('autofill_success'))));
   }
 
   void _onCategoryChanged(int? categoryId) {
@@ -250,7 +324,23 @@ class _YieldPredictionScreenState extends State<YieldPredictionScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _buildInfoCard(l10n.translate('yield_prediction'), l10n.translate('yield_model_detail'), modelThemeColor, darkGreen),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
+                  
+                  Center(
+                    child: OutlinedButton.icon(
+                      onPressed: _autofillFromPlans,
+                      icon: const Icon(Icons.auto_awesome, size: 20),
+                      label: Text(l10n.translate('autofill_from_plans'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: modelThemeColor,
+                        side: BorderSide(color: modelThemeColor),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
                   Form(key: _formKey, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _buildLabel(l10n.translate('governorate'), darkGreen),
                     const SizedBox(height: 8),

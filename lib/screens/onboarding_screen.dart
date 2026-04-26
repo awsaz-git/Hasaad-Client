@@ -20,17 +20,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     {
       'title': 'onboarding_title_1',
       'description': 'onboarding_desc_1',
-      'image': 'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?q=80&w=1000&auto=format&fit=crop', 
+      'image': 'assets/onboarding-1.avif', 
     },
     {
       'title': 'onboarding_title_2',
       'description': 'onboarding_desc_2',
-      'image': 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?q=80&w=1000&auto=format&fit=crop',
+      'image': 'assets/onboarding-2.avif',
     },
     {
       'title': 'onboarding_title_3',
       'description': 'onboarding_desc_3',
-      'image': 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?q=80&w=1000&auto=format&fit=crop',
+      'image': 'assets/onboarding-3.avif',
     },
   ];
 
@@ -167,7 +167,7 @@ class _OnboardingPage extends StatelessWidget {
               ],
             ),
             clipBehavior: Clip.antiAlias,
-            child: Image.network(
+            child: Image.asset(
               image, 
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(

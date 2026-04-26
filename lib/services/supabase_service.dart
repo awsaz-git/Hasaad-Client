@@ -109,18 +109,9 @@ class SupabaseService {
       final planResponse = await _supabase.from('planting_plans').insert(plan.toJson()).select().single();
       final insertedPlanId = planResponse['id'].toString();
 
-      await _updateCropSupply(
-        cropId: plan.cropId,
-        governorateId: plan.governorateId,
-        areaDelta: plan.areaDonums,
-        yieldDelta: plan.estimatedYieldTons ?? 0.0,
-        countDelta: 1,
-      );
-
       final crops = await getCrops();
       final crop = crops.firstWhere((c) => c.id == plan.cropId);
       
-      // Create localized tasks for planting and harvesting
       await addTask(Task(
         farmerId: plan.farmerId,
         title: 'plant_crop', 
@@ -142,61 +133,42 @@ class SupabaseService {
     }
   }
 
-  Future<void> updatePlanStatusWithSupply(PlantingPlan plan, String newStatus) async {
-    if (plan.status == newStatus) return;
-
+  Future<void> updatePlanStatus(String planId, String newStatus) async {
     try {
-      await _supabase.from('planting_plans').update({'status': newStatus}).eq('id', plan.id!);
-
-      if (plan.status == 'active' && (newStatus == 'cancelled' || newStatus == 'harvested')) {
-        await _updateCropSupply(
-          cropId: plan.cropId,
-          governorateId: plan.governorateId,
-          areaDelta: -plan.areaDonums,
-          yieldDelta: -(plan.estimatedYieldTons ?? 0.0),
-          countDelta: -1,
-        );
+      await _supabase.from('planting_plans').update({'status': newStatus}).eq('id', planId);
+      
+      if (newStatus == 'cancelled') {
+        await _supabase.from('crop_financials').delete().eq('planting_plan_id', planId);
       }
     } catch (e) {
-      print('Postgres error in updatePlanStatusWithSupply: $e');
+      print('Error in updatePlanStatus: $e');
       rethrow;
     }
   }
 
-  Future<void> _updateCropSupply({
-    required int cropId,
-    required int governorateId,
-    required double areaDelta,
-    required double yieldDelta,
-    required int countDelta,
-  }) async {
-    final today = DateTime.now().toIso8601String().split('T')[0];
-
-    final existing = await _supabase
-        .from('crop_supply')
-        .select()
-        .eq('crop_id', cropId)
-        .eq('governorate_id', governorateId)
-        .eq('supply_date', today)
-        .maybeSingle();
-
-    if (existing != null) {
-      await _supabase.from('crop_supply').update({
-        'total_area_donums': (existing['total_area_donums'] as num).toDouble() + areaDelta,
-        'total_estimated_tons': (existing['total_estimated_tons'] as num).toDouble() + yieldDelta,
-        'active_plans_count': (existing['active_plans_count'] as int) + countDelta,
-      }).eq('id', existing['id']);
-    } else {
-      if (countDelta > 0) {
-        await _supabase.from('crop_supply').insert({
-          'crop_id': cropId,
-          'governorate_id': governorateId,
-          'total_area_donums': areaDelta,
-          'total_estimated_tons': yieldDelta,
-          'active_plans_count': countDelta,
-          'supply_date': today,
-        });
+  Future<void> deletePlantingPlan(String planId) async {
+    try {
+      // 1. Find related tasks
+      final tasks = await _supabase.from('tasks').select('id').eq('planting_plan_id', planId);
+      final taskIds = (tasks as List).map((t) => t['id'].toString()).toList();
+      
+      if (taskIds.isNotEmpty) {
+        // 2. Delete reminders for these tasks
+        for (var tid in taskIds) {
+          await _supabase.from('reminders').delete().eq('task_id', tid);
+        }
+        // 3. Delete the tasks themselves
+        await _supabase.from('tasks').delete().eq('planting_plan_id', planId);
       }
+
+      // 4. Delete financial records linked to this plan
+      await _supabase.from('crop_financials').delete().eq('planting_plan_id', planId);
+
+      // 5. Delete the plan itself
+      await _supabase.from('planting_plans').delete().eq('id', planId);
+    } catch (e) {
+      print('Error in deletePlantingPlan: $e');
+      rethrow;
     }
   }
 
@@ -235,6 +207,7 @@ class SupabaseService {
   }
 
   Future<void> deleteTask(String taskId) async {
+    await _supabase.from('reminders').delete().eq('task_id', taskId);
     await _supabase.from('tasks').delete().eq('id', taskId);
   }
 
@@ -260,8 +233,7 @@ class SupabaseService {
     for (var item in response) {
       final task = Task.fromJson(item['tasks']);
       
-      String title = task.title;
-      String body = task.description ?? '';
+      String title = task.title;      String body = task.description ?? '';
 
       if (task.title == 'plant_crop' || task.title == 'harvest_crop') {
         final cropId = int.tryParse(task.description ?? '') ?? 0;
@@ -390,21 +362,32 @@ class SupabaseService {
   }
 
   Future<void> upsertCropFinancial(CropFinancial financial) async {
-    final existing = await _supabase
-        .from('crop_financials')
-        .select()
-        .eq('farmer_id', financial.farmerId)
-        .eq('crop_id', financial.cropId)
-        .maybeSingle();
-
-    if (existing != null) {
-      await _supabase
-          .from('crop_financials')
-          .update(financial.toJson())
-          .eq('id', existing['id']);
-    } else {
-      await _supabase.from('crop_financials').insert(financial.toJson());
+    if (financial.id != null) {
+      await _supabase.from('crop_financials').update(financial.toJson()).eq('id', financial.id!);
+      return;
     }
+
+    if (financial.plantingPlanId != null) {
+      final existing = await _supabase
+          .from('crop_financials')
+          .select()
+          .eq('planting_plan_id', financial.plantingPlanId!)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _supabase
+            .from('crop_financials')
+            .update(financial.toJson())
+            .eq('id', existing['id']);
+        return;
+      }
+    }
+
+    await _supabase.from('crop_financials').insert(financial.toJson());
+  }
+
+  Future<void> deleteCropFinancial(String id) async {
+    await _supabase.from('crop_financials').delete().eq('id', id);
   }
 
   // --- Suggestions ---

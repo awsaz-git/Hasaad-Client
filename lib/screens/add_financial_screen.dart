@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../models/crop.dart';
-import '../models/category.dart';
+import '../models/planting_plan.dart';
 import '../models/crop_financial.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_localizations.dart';
@@ -19,16 +20,33 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
   final _formKey = GlobalKey<FormState>();
   final _service = SupabaseService();
   final _priceController = TextEditingController();
-  final _expensesController = TextEditingController();
+  
+  final _seedsController = TextEditingController();
+  final _fertilizerController = TextEditingController();
+  final _irrigationController = TextEditingController();
+  final _laborController = TextEditingController();
+  final _pesticidesController = TextEditingController();
+  final _transportController = TextEditingController();
+  final _otherController = TextEditingController();
+  
   final _notesController = TextEditingController();
   
+  List<PlantingPlan> _availablePlans = [];
   List<Crop> _allCrops = [];
-  List<Crop> _filteredCrops = [];
-  List<CropCategory> _categories = [];
-  int? _selectedCategoryId;
-  int? _selectedCropId;
+  String? _selectedPlanId;
   bool _isLoading = true;
   bool _isSaving = false;
+
+  double get _totalExpenses {
+    double s = double.tryParse(_seedsController.text) ?? 0;
+    double f = double.tryParse(_fertilizerController.text) ?? 0;
+    double i = double.tryParse(_irrigationController.text) ?? 0;
+    double l = double.tryParse(_laborController.text) ?? 0;
+    double p = double.tryParse(_pesticidesController.text) ?? 0;
+    double t = double.tryParse(_transportController.text) ?? 0;
+    double o = double.tryParse(_otherController.text) ?? 0;
+    return s + f + i + l + p + t + o;
+  }
 
   @override
   void initState() {
@@ -36,15 +54,38 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
     _loadInitialData();
     if (widget.existingFinancial != null) {
       _priceController.text = widget.existingFinancial!.sellingPricePerTon.toString();
-      _expensesController.text = widget.existingFinancial!.totalExpenses.toString();
+      _seedsController.text = widget.existingFinancial!.seedCost?.toString() ?? '';
+      _fertilizerController.text = widget.existingFinancial!.fertilizerCost?.toString() ?? '';
+      _irrigationController.text = widget.existingFinancial!.irrigationCost?.toString() ?? '';
+      _laborController.text = widget.existingFinancial!.laborCost?.toString() ?? '';
+      _pesticidesController.text = widget.existingFinancial!.pesticideCost?.toString() ?? '';
+      _transportController.text = widget.existingFinancial!.transportCost?.toString() ?? '';
+      _otherController.text = widget.existingFinancial!.otherCost?.toString() ?? '';
       _notesController.text = widget.existingFinancial!.notes ?? '';
+      _selectedPlanId = widget.existingFinancial!.plantingPlanId;
     }
+
+    // Add listeners for live total update
+    void listener() => setState(() {});
+    _seedsController.addListener(listener);
+    _fertilizerController.addListener(listener);
+    _irrigationController.addListener(listener);
+    _laborController.addListener(listener);
+    _pesticidesController.addListener(listener);
+    _transportController.addListener(listener);
+    _otherController.addListener(listener);
   }
 
   @override
   void dispose() {
     _priceController.dispose();
-    _expensesController.dispose();
+    _seedsController.dispose();
+    _fertilizerController.dispose();
+    _irrigationController.dispose();
+    _laborController.dispose();
+    _pesticidesController.dispose();
+    _transportController.dispose();
+    _otherController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -54,30 +95,23 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
       final user = _service.currentUser;
       if (user == null) return;
 
-      // 1. Fetch user's plans to see which crops they have
       final plans = await _service.getUserPlantingPlans(user.id);
-      final myCropIds = plans.map((p) => p.cropId).toSet();
+      final financials = await _service.getCropFinancials(user.id);
+      final crops = await _service.getCrops();
 
-      // 2. Fetch all crops and categories
-      final allCrops = await _service.getCrops();
-      final allCategories = await _service.getCategories();
-      
+      final existingPlanIds = financials
+          .where((f) => f.plantingPlanId != null && f.id != widget.existingFinancial?.id)
+          .map((f) => f.plantingPlanId!)
+          .toSet();
+
       if (mounted) {
         setState(() {
-          // 3. Filter crops to only include those in user's plans
-          _allCrops = allCrops.where((c) => myCropIds.contains(c.id)).toList();
-          
-          // 4. Filter categories to only include those that have the relevant crops
-          final myCategoryIds = _allCrops.map((c) => c.categoryId).toSet();
-          _categories = allCategories.where((cat) => myCategoryIds.contains(cat.id)).toList();
-          
-          if (widget.existingFinancial != null) {
-            _selectedCropId = widget.existingFinancial!.cropId;
-            final crop = allCrops.firstWhere((c) => c.id == _selectedCropId);
-            _selectedCategoryId = crop.categoryId;
-            _filteredCrops = _allCrops.where((c) => c.categoryId == _selectedCategoryId).toList();
-          }
-          
+          _allCrops = crops;
+          // Filter: only show plans that are active or harvested AND don't have financials yet
+          _availablePlans = plans.where((p) {
+            final isEligibleStatus = p.status == 'active' || p.status == 'harvested';
+            return isEligibleStatus && !existingPlanIds.contains(p.id);
+          }).toList();
           _isLoading = false;
         });
       }
@@ -86,30 +120,28 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
     }
   }
 
-  void _onCategoryChanged(int? categoryId) {
-    setState(() {
-      _selectedCategoryId = categoryId;
-      if (categoryId == null) {
-        _filteredCrops = [];
-      } else {
-        _filteredCrops = _allCrops.where((c) => c.categoryId == categoryId).toList();
-      }
-      _selectedCropId = null; 
-    });
-  }
-
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate() || _selectedCropId == null) return;
+    if (!_formKey.currentState!.validate() || _selectedPlanId == null) return;
 
     setState(() => _isSaving = true);
     try {
       final user = _service.currentUser;
+      final plan = _availablePlans.firstWhere((p) => p.id == _selectedPlanId);
+      
       final financial = CropFinancial(
+        id: widget.existingFinancial?.id,
         farmerId: user!.id,
-        cropId: _selectedCropId!,
+        cropId: plan.cropId,
         sellingPricePerTon: double.parse(_priceController.text),
-        totalExpenses: double.parse(_expensesController.text),
+        seedCost: double.tryParse(_seedsController.text),
+        fertilizerCost: double.tryParse(_fertilizerController.text),
+        irrigationCost: double.tryParse(_irrigationController.text),
+        laborCost: double.tryParse(_laborController.text),
+        pesticideCost: double.tryParse(_pesticidesController.text),
+        transportCost: double.tryParse(_transportController.text),
+        otherCost: double.tryParse(_otherController.text),
         notes: _notesController.text,
+        plantingPlanId: _selectedPlanId,
       );
 
       await _service.upsertCropFinancial(financial);
@@ -128,7 +160,7 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final lang = Localizations.localeOf(context).languageCode;
-    const darkGreen = AppTheme.primary; // Official brand color
+    const darkGreen = AppTheme.primary;
 
     return Scaffold(
       appBar: AppBar(
@@ -146,16 +178,16 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
         ? const Center(child: CircularProgressIndicator(color: darkGreen))
         : SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: _categories.isEmpty 
+            child: _availablePlans.isEmpty && widget.existingFinancial == null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 100),
-                      Icon(Icons.info_outline, size: 64, color: Colors.grey[400]),
+                      Icon(Icons.assignment_late_outlined, size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
-                        l10n.translate('no_plans_financial_hint') ?? 'Add a planting plan first to record financial data.',
+                        l10n.translate('no_eligible_plans'),
                         textAlign: TextAlign.center,
                         style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 16),
                       ),
@@ -167,107 +199,113 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(l10n.translate('market_categories'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: darkGreen)),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<int>(
-                        value: _selectedCategoryId,
-                        decoration: InputDecoration(
-                          hintText: l10n.translate('all_categories'),
-                          prefixIcon: const Icon(Icons.category_outlined, color: darkGreen),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(color: darkGreen, width: 2),
-                          ),
-                        ),
-                        items: _categories.map((c) => DropdownMenuItem(
-                          value: c.id,
-                          child: Text('${c.emoji} ${c.getName(lang)}', style: GoogleFonts.cairo()),
-                        )).toList(),
-                        onChanged: widget.existingFinancial == null ? _onCategoryChanged : null,
-                      ),
-                      const SizedBox(height: 24),
-
-                      if (_selectedCategoryId != null) ...[
-                        Text(l10n.translate('select_crop'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: darkGreen)),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          value: _selectedCropId,
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.grass_outlined, color: darkGreen),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: const BorderSide(color: darkGreen, width: 2),
+                      Text(l10n.translate('select_plan_to_record'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: darkGreen)),
+                      const SizedBox(height: 12),
+                      ..._availablePlans.map((plan) {
+                        final crop = _allCrops.firstWhere((c) => c.id == plan.cropId, orElse: () => _allCrops.first);
+                        final isSelected = _selectedPlanId == plan.id;
+                        
+                        return GestureDetector(
+                          onTap: widget.existingFinancial != null ? null : () => setState(() => _selectedPlanId = plan.id),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isSelected ? darkGreen.withOpacity(0.05) : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSelected ? darkGreen : Colors.grey.shade200,
+                                width: isSelected ? 2 : 1
+                              ),
+                              boxShadow: isSelected ? [] : [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 50, height: 50,
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? darkGreen.withOpacity(0.1) : Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(crop.emoji, style: const TextStyle(fontSize: 28)),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(crop.getName(lang), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text(
+                                        '${plan.areaDonums} ${l10n.translate('dunums')} • ${l10n.translate('harvest_date')}: ${DateFormat('yyyy-MM-dd').format(plan.harvestDate)}',
+                                        style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[600]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  const Icon(Icons.check_circle, color: darkGreen),
+                              ],
+                            ),
                           ),
-                          items: _filteredCrops.map((c) => DropdownMenuItem(
-                            value: c.id,
-                            child: Text('${c.emoji} ${c.getName(lang)}'),
-                          )).toList(),
-                          onChanged: widget.existingFinancial == null 
-                            ? (val) => setState(() => _selectedCropId = val)
-                            : null,
-                          validator: (v) => v == null ? l10n.translate('required_field') : null,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                        );
+                      }).toList(),
+                      const SizedBox(height: 24),
 
                       Text(l10n.translate('selling_price_per_ton'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: darkGreen)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _priceController,
                         keyboardType: TextInputType.number,
-                        style: GoogleFonts.cairo(),
                         decoration: InputDecoration(
                           hintText: l10n.translate('placeholder_selling_price'),
                           prefixIcon: const Icon(Icons.price_change_outlined, color: darkGreen),
                           suffixText: l10n.translate('jod'),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(color: darkGreen, width: 2),
-                          ),
                         ),
                         validator: (v) => v == null || v.isEmpty ? l10n.translate('required_field') : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
 
-                      Text(l10n.translate('total_expenses'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: darkGreen)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _expensesController,
-                        keyboardType: TextInputType.number,
-                        style: GoogleFonts.cairo(),
-                        decoration: InputDecoration(
-                          hintText: l10n.translate('placeholder_total_expenses'),
-                          prefixIcon: const Icon(Icons.account_balance_wallet_outlined, color: darkGreen),
-                          suffixText: l10n.translate('jod'),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(color: darkGreen, width: 2),
-                          ),
+                      // Expenses Section
+                      Text(l10n.translate('expenses'), style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: darkGreen)),
+                      const SizedBox(height: 16),
+                      _buildExpenseField(l10n.translate('seeds_cost'), _seedsController, Icons.grass),
+                      _buildExpenseField(l10n.translate('fertilizer_cost'), _fertilizerController, Icons.science_outlined),
+                      _buildExpenseField(l10n.translate('irrigation_cost'), _irrigationController, Icons.water_drop_outlined),
+                      _buildExpenseField(l10n.translate('labor_cost'), _laborController, Icons.people_outline),
+                      _buildExpenseField(l10n.translate('pesticide_cost'), _pesticidesController, Icons.bug_report_outlined),
+                      _buildExpenseField(l10n.translate('transport_cost'), _transportController, Icons.local_shipping_outlined),
+                      _buildExpenseField(l10n.translate('other_cost'), _otherController, Icons.more_horiz),
+
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(top: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                        validator: (v) => v == null || v.isEmpty ? l10n.translate('required_field') : null,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(l10n.translate('total_expenses_summary') ?? 'Total Expenses:', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+                            Text('${_totalExpenses.toStringAsFixed(2)} ${l10n.translate('jod')}', 
+                                 style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 18)),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 24),
 
+                      const SizedBox(height: 24),
                       Text(l10n.translate('description'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: darkGreen)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _notesController,
                         maxLines: 3,
-                        style: GoogleFonts.cairo(),
                         decoration: InputDecoration(
                           hintText: l10n.translate('enter_financial_desc'),
                           prefixIcon: const Icon(Icons.note_alt_outlined, color: darkGreen),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: const BorderSide(color: darkGreen, width: 2),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -276,7 +314,7 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
-                          onPressed: _isSaving ? null : _save,
+                          onPressed: _isSaving || _selectedPlanId == null ? null : _save,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: darkGreen,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -290,6 +328,24 @@ class _AddFinancialScreenState extends State<AddFinancialScreen> {
                   ),
                 ),
           ),
+    );
+  }
+
+  Widget _buildExpenseField(String label, TextEditingController controller, IconData icon) {
+    final l10n = AppLocalizations.of(context)!;
+    const darkGreen = AppTheme.primary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: darkGreen),
+          suffixText: l10n.translate('jod'),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+        ),
+      ),
     );
   }
 }

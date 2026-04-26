@@ -117,9 +117,49 @@ class StatisticsPageState extends State<StatisticsPage> with SingleTickerProvide
 
     setState(() => _isLoading = true);
     try {
-      await _service.updatePlanStatusWithSupply(plan, newStatus);
+      await _service.updatePlanStatus(plan.id!, newStatus);
       if (mounted) {
-        _loadData();
+        await _loadData();
+        homeScreenKey.currentState?.refreshApp();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleDeletePlan(String planId) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(l10n.translate('confirm_delete'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        content: Text(l10n.translate('confirm_delete_pln_desc'), style: GoogleFonts.cairo()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.translate('cancel'), style: GoogleFonts.cairo(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.translate('delete'), style: GoogleFonts.cairo(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _service.deletePlantingPlan(planId);
+      if (mounted) {
+        await _loadData();
         homeScreenKey.currentState?.refreshApp();
       }
     } catch (e) {
@@ -300,6 +340,11 @@ class StatisticsPageState extends State<StatisticsPage> with SingleTickerProvide
                                     ],
                                   ),
                                 ),
+                                if (plan.status == 'cancelled')
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    onPressed: () => _handleDeletePlan(plan.id!),
+                                  ),
                               ],
                             ),
                           ),

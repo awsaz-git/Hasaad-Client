@@ -28,12 +28,12 @@ class _FinancialScreenState extends State<FinancialScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final user = _service.currentUser;
       if (user == null) return;
 
-      // 1. Fetch data from Supabase
       final financials = await _service.getCropFinancials(user.id);
       final plans = await _service.getUserPlantingPlans(user.id);
       final crops = await _service.getCrops();
@@ -41,14 +41,45 @@ class _FinancialScreenState extends State<FinancialScreen> {
       if (mounted) {
         setState(() {
           _financials = financials;
-          // Filter only active plans for yield calculation
-          _activePlans = plans.where((p) => p.status == 'active').toList();
+          // Filter only active OR harvested plans for yield calculation as per updated rules
+          _activePlans = plans.where((p) => p.status == 'active' || p.status == 'harvested').toList();
           _allCrops = crops;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleDeleteFinancial(String id) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.translate('confirm_delete')),
+        content: Text(l10n.translate('confirm_delete_financial')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.translate('cancel'))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            child: Text(l10n.translate('delete'), style: const TextStyle(color: Colors.red))
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _isLoading = true);
+      try {
+        await _service.deleteCropFinancial(id);
+        await _loadData();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -60,15 +91,19 @@ class _FinancialScreenState extends State<FinancialScreen> {
 
     if (_isLoading) return const Center(child: CircularProgressIndicator(color: primaryGreen));
 
-    // --- Totals Calculation ---
     double totalRevenue = 0;
     double totalExpenses = 0;
 
     for (var fin in _financials) {
-      // Sum estimated yield for this specific crop
-      double cropYield = _activePlans
-          .where((p) => p.cropId == fin.cropId)
-          .fold(0.0, (sum, p) => sum + (p.estimatedYieldTons ?? 0.0));
+      double cropYield = 0;
+      if (fin.plantingPlanId != null) {
+        final plan = _activePlans.where((p) => p.id == fin.plantingPlanId).firstOrNull;
+        cropYield = plan?.estimatedYieldTons ?? 0;
+      } else {
+        cropYield = _activePlans
+            .where((p) => p.cropId == fin.cropId)
+            .fold(0.0, (sum, p) => sum + (p.estimatedYieldTons ?? 0.0));
+      }
       
       totalRevenue += cropYield * fin.sellingPricePerTon;
       totalExpenses += fin.totalExpenses;
@@ -168,10 +203,15 @@ class _FinancialScreenState extends State<FinancialScreen> {
       orElse: () => Crop(id: 0, nameEn: 'Unknown', nameAr: 'غير معروف', emoji: '🌱', avgYield: 0, categoryId: 0),
     );
 
-    // --- Calculations ---
-    double cropYield = _activePlans
-        .where((p) => p.cropId == fin.cropId)
-        .fold(0.0, (sum, p) => sum + (p.estimatedYieldTons ?? 0.0));
+    double cropYield = 0;
+    if (fin.plantingPlanId != null) {
+      final plan = _activePlans.where((p) => p.id == fin.plantingPlanId).firstOrNull;
+      cropYield = plan?.estimatedYieldTons ?? 0;
+    } else {
+      cropYield = _activePlans
+          .where((p) => p.cropId == fin.cropId)
+          .fold(0.0, (sum, p) => sum + (p.estimatedYieldTons ?? 0.0));
+    }
     
     double revenue = cropYield * fin.sellingPricePerTon;
     double profit = revenue - fin.totalExpenses;
@@ -184,54 +224,70 @@ class _FinancialScreenState extends State<FinancialScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      child: InkWell(
-        onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AddFinancialScreen(existingFinancial: fin)),
-          );
-          if (result == true) _loadData();
-        },
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Row(
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AddFinancialScreen(existingFinancial: fin)),
+              );
+              if (result == true) _loadData();
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
                 children: [
-                  Text(crop.emoji, style: const TextStyle(fontSize: 28)),
-                  const SizedBox(width: 12),
-                  Text(crop.getName(lang), style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (profit >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${margin.toStringAsFixed(1)}%',
-                      style: GoogleFonts.cairo(
-                        color: profit >= 0 ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12
+                  Row(
+                    children: [
+                      Text(crop.emoji, style: const TextStyle(fontSize: 28)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(crop.getName(lang), style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
+                            if (fin.plantingPlanId != null)
+                              Text(l10n.translate('linked_to_plan'), style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (profit >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${margin.toStringAsFixed(1)}%',
+                          style: GoogleFonts.cairo(
+                            color: profit >= 0 ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        onPressed: () => _handleDeleteFinancial(fin.id!),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStat(l10n.translate('revenue'), revenue, Colors.black87),
+                      _buildStat(l10n.translate('expenses'), fin.totalExpenses, Colors.redAccent),
+                      _buildStat(l10n.translate('profit'), profit, profit >= 0 ? Colors.green : Colors.red),
+                    ],
                   ),
                 ],
               ),
-              const Divider(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildStat(l10n.translate('revenue'), revenue, Colors.black87),
-                  _buildStat(l10n.translate('expenses'), fin.totalExpenses, Colors.redAccent),
-                  _buildStat(l10n.translate('profit'), profit, profit >= 0 ? Colors.green : Colors.red),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

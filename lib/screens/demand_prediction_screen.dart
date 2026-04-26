@@ -213,7 +213,7 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
               const SizedBox(height: 16),
               _buildResultRow(Icons.shopping_cart_outlined, l10n.translate('market_location'), marketGov.getName(lang), darkGreen),
               const SizedBox(height: 16),
-              _buildResultRow(Icons.calendar_today_outlined, l10n.translate('date'), DateFormat('yyyy-MM-dd').format(_predictionDate!), darkGreen),
+              _buildResultRow(Icons.calendar_today_outlined, l10n.translate('demand_date_label'), DateFormat('yyyy-MM-dd').format(_predictionDate!), darkGreen),
               const SizedBox(height: 40),
               SizedBox(width: double.infinity, height: 60, child: ElevatedButton(onPressed: () => Navigator.pop(context), style: ElevatedButton.styleFrom(backgroundColor: darkGreen, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), elevation: 0), child: Text(l10n.translate('confirm'), style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)))),
               const SizedBox(height: 16),
@@ -270,7 +270,7 @@ class _DemandPredictionScreenState extends State<DemandPredictionScreen> {
                       const SizedBox(height: 20),
                     ],
 
-                    _buildLabel(l10n.translate('date'), darkGreen),
+                    _buildLabel(l10n.translate('demand_date_label'), darkGreen),
                     const SizedBox(height: 8),
                     _buildDatePicker(_predictionDate, () => _selectDate(context), primaryYellow, darkGreen, l10n),
 
