@@ -31,65 +31,11 @@ Hasaad is a Flutter application built for farmers in Saudi Arabia. It aggregates
 
 ---
 
-## Getting Started
+## Download
 
-### Prerequisites
+The app is available as an Android APK — no build required.
 
-- Flutter SDK `^3.11.0`
-- Dart SDK (bundled with Flutter)
-- A Supabase project (for backend and auth)
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/awsaz-git/hasaad-client.git
-cd hasaad-client
-
-# Install dependencies
-flutter pub get
-
-# Copy the environment template and fill in your Supabase credentials
-cp .env.example .env
-
-# Run code generation
-dart run build_runner build --delete-conflicting-outputs
-
-# Launch the app
-flutter run
-```
-
-### Environment variables
-
-Create a `.env` file at the project root:
-
-```
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-```
-
----
-
-## Project Structure
-
-```
-lib/
-├── main.dart
-├── models/        # Freezed data models (crops, plans, financials, …)
-├── screens/       # One file per screen
-├── services/      # Supabase, weather, and notification services
-├── utils/         # Theme, localisation helpers, validators
-└── widgets/       # Shared UI components
-assets/
-├── l10n/          # ARB and JSON translation files (ar / en)
-└── …              # Images, splash, icons
-```
-
----
-
-## Supported Platforms
-
-Android · iOS · Web · macOS · Linux · Windows (Flutter multi-platform build)
+[Download APK from Google Drive](https://drive.google.com/drive/u/0/folders/1Ha5gJ1BeMUuF-kNPEu5_mRP4VSwJ03R9)
 
 ---
 
